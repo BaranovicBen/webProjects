@@ -84,7 +84,7 @@ describe('Validation Utilities', () => {
     test('should throw on array with wrong length', () => {
       const intervals = [[1705312800000]]; // Only one element
       expect(() => normalizeBusyIntervals(intervals))
-        .toThrow('Interval at index 0 must have exactly 2 elements');
+        .toThrow('Interval at index 0 must have exactly 2 elements (start and end)');
     });
 
     test('should throw on object missing start', () => {

@@ -29,7 +29,7 @@ function normalizeBusyIntervals(intervals) {
     // Handle array format: [start, end]
     if (Array.isArray(interval)) {
       if (interval.length !== 2) {
-        throw new Error(`Interval at index ${i} must have exactly 2 elements [start, end]`);
+        throw new Error(`Interval at index ${i} must have exactly 2 elements (start and end)`);
       }
       [start, end] = interval;
     }
