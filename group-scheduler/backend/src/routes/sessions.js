@@ -4,6 +4,7 @@ const router = express.Router();
 const sessionService = require('../services/sessionService');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { createSessionLimiter, joinLimiter } = require('../middleware/rateLimiter');
+const { normalizeBusyIntervals } = require('../utils/validation');
 
 /**
  * POST /api/sessions
@@ -55,11 +56,22 @@ router.post('/:sessionId/intervals', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'busyIntervals must be an array' });
   }
   
+  // Normalize and validate intervals
+  let normalizedIntervals;
+  try {
+    normalizedIntervals = normalizeBusyIntervals(busyIntervals);
+  } catch (error) {
+    return res.status(400).json({ 
+      error: 'Invalid busyIntervals format',
+      details: error.message 
+    });
+  }
+  
   const result = await sessionService.uploadBusyIntervals(
     sessionId,
     participantId,
     secret,
-    busyIntervals
+    normalizedIntervals
   );
   
   res.status(200).json(result);
