@@ -93,7 +93,7 @@ export default function ImportCalendarScreen({ route, navigation }) {
             value={icalContent}
             onChangeText={setIcalContent}
             placeholder="Paste iCal content here..."
-            multiline
+            multiline={true}
             numberOfLines={10}
           />
           
