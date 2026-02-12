@@ -1,5 +1,5 @@
 // iCal parsing utility
-import ICAL from 'ical';
+import ICAL from 'ical.js';
 
 /**
  * Parse iCal file content and extract busy intervals
@@ -11,26 +11,45 @@ import ICAL from 'ical';
 export const parseICalToBusyIntervals = (icalContent, rangeStart, rangeEnd) => {
   try {
     const busyIntervals = [];
-    const data = ICAL.parseICS(icalContent);
     
-    for (const key in data) {
-      const event = data[key];
+    // Parse the iCal content
+    const jcalData = ICAL.parse(icalContent);
+    const comp = new ICAL.Component(jcalData);
+    
+    // Get all VEVENT components
+    const vevents = comp.getAllSubcomponents('vevent');
+    
+    for (const vevent of vevents) {
+      const event = new ICAL.Event(vevent);
       
-      // Only process VEVENT types
-      if (event.type !== 'VEVENT') continue;
+      // Get start and end times
+      if (!event.startDate || !event.endDate) continue;
       
-      // Skip if no start/end
-      if (!event.start || !event.end) continue;
-      
-      const startTime = new Date(event.start).getTime();
-      const endTime = new Date(event.end).getTime();
-      
-      // Handle recurring events
-      if (event.rrule) {
-        const occurrences = expandRecurrence(event, rangeStart, rangeEnd);
-        busyIntervals.push(...occurrences);
+      // Check if event is recurring
+      if (event.isRecurring()) {
+        // Handle recurring events
+        const startDate = ICAL.Time.fromJSDate(new Date(rangeStart), false);
+        const endDate = ICAL.Time.fromJSDate(new Date(rangeEnd), false);
+        
+        const iterator = event.iterator(startDate);
+        let next;
+        
+        while ((next = iterator.next())) {
+          if (next.compare(endDate) > 0) break;
+          
+          const occurrenceStart = next.toJSDate().getTime();
+          const duration = event.duration.toSeconds() * 1000;
+          const occurrenceEnd = occurrenceStart + duration;
+          
+          if (occurrenceStart >= rangeStart && occurrenceEnd <= rangeEnd) {
+            busyIntervals.push([occurrenceStart, occurrenceEnd]);
+          }
+        }
       } else {
         // Single event
+        const startTime = event.startDate.toJSDate().getTime();
+        const endTime = event.endDate.toJSDate().getTime();
+        
         if (startTime < rangeEnd && endTime > rangeStart) {
           busyIntervals.push([startTime, endTime]);
         }
@@ -43,76 +62,6 @@ export const parseICalToBusyIntervals = (icalContent, rangeStart, rangeEnd) => {
     throw new Error('Failed to parse iCal file');
   }
 };
-
-/**
- * Expand recurring events within a date range
- * @param {object} event - VEVENT object
- * @param {number} rangeStart - Start of date range
- * @param {number} rangeEnd - End of date range
- * @returns {Array<[number, number]>} - Array of occurrences
- */
-function expandRecurrence(event, rangeStart, rangeEnd) {
-  const occurrences = [];
-  
-  try {
-    const startDate = new Date(event.start);
-    const endDate = new Date(event.end);
-    const duration = endDate.getTime() - startDate.getTime();
-    
-    // Get RRULE
-    const rrule = event.rrule;
-    
-    // Simple weekly recurrence support
-    if (rrule.freq === 'WEEKLY') {
-      const count = rrule.count || 52; // Default to 1 year
-      const interval = rrule.interval || 1;
-      
-      let currentDate = new Date(startDate);
-      
-      for (let i = 0; i < count; i++) {
-        const occurrenceStart = currentDate.getTime();
-        const occurrenceEnd = occurrenceStart + duration;
-        
-        // Check if within range
-        if (occurrenceStart >= rangeStart && occurrenceEnd <= rangeEnd) {
-          // Check if not excluded
-          if (!isExcluded(occurrenceStart, event.exdate)) {
-            occurrences.push([occurrenceStart, occurrenceEnd]);
-          }
-        }
-        
-        // Stop if past range
-        if (occurrenceStart > rangeEnd) break;
-        
-        // Move to next occurrence
-        currentDate.setDate(currentDate.getDate() + (7 * interval));
-      }
-    }
-  } catch (error) {
-    console.error('Error expanding recurrence:', error);
-  }
-  
-  return occurrences;
-}
-
-/**
- * Check if a date is excluded by EXDATE
- * @param {number} timestamp - Timestamp to check
- * @param {Array} exdates - Array of excluded dates
- * @returns {boolean} - True if excluded
- */
-function isExcluded(timestamp, exdates) {
-  if (!exdates || !Array.isArray(exdates)) return false;
-  
-  const date = new Date(timestamp);
-  date.setHours(0, 0, 0, 0);
-  
-  return exdates.some(exdate => {
-    const exd = new Date(exdate);
-    exd.setHours(0, 0, 0, 0);
-    return exd.getTime() === date.getTime();
-  });
-}
 
 /**
  * Generate a sample iCal file for testing

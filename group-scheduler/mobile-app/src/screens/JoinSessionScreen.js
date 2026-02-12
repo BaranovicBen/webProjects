@@ -66,7 +66,7 @@ export default function JoinSessionScreen({ navigation }) {
             onChangeText={setSecret}
             placeholder="Enter session secret"
             autoCapitalize="none"
-            secureTextEntry
+            secureTextEntry={true}
           />
           
           <TouchableOpacity
